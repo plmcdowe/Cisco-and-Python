@@ -7,7 +7,7 @@
 
 ### [ 1 ][ ip_nestedDict.py ](https://github.com/plmcdowe/Cisco-and-Python/blob/60ce3fcb285e051494d1522b646fd5f53ba33fd0/ip_nestedDict.py)
 > - <b>It might not seem like it, but this is honestly the most important file here.</b></br>
-> - <b>It's a dictionary of nested lists that allows really granular looping of specific device types from specific sites.</b></br>
+> - <b>It's a dictionary of nested lists that allows granular looping of specific device types from specific sites.</b></br>
 >
 > <b><ins>Here's the sanitized structure</ins>:</b>
 >> ```python
