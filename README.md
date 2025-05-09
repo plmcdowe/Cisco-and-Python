@@ -1,8 +1,8 @@
 ### <b><ins>Netmiko Documentation</ins>:</b>
-1. [ Netmiko GitHub ](https://github.com/ktbyers/netmiko)
-2. [ Netmiko author's .io index ](https://ktbyers.github.io/netmiko/docs/netmiko/index.html)
-3. [ Section covering Netmiko from ](https://python-automation-book.readthedocs.io/en/1.0/12_netmiko/01_netmiko.html) python-automation-book
-4. [ Python For Net Eng's blog post ](https://pynet.twb-tech.com/blog/netmiko-python-library.html) with links to additional Netmiko documentation.
+1. [Netmiko GitHub](https://github.com/ktbyers/netmiko)
+2. [Netmiko author's .io index](https://ktbyers.github.io/netmiko/docs/netmiko/index.html)
+3. [Section covering Netmiko from](https://python-automation-book.readthedocs.io/en/1.0/12_netmiko/01_netmiko.html) python-automation-book
+4. [Python For Net Eng's blog post](https://pynet.twb-tech.com/blog/netmiko-python-library.html) with links to additional Netmiko documentation.
 
 ### [ 1 ] <ins>ip_nestedDict.py</ins>:</br>
 > - <b>It might not seem like it, but [ip_nestedDict.py](https://github.com/plmcdowe/Cisco-and-Python/blob/60ce3fcb285e051494d1522b646fd5f53ba33fd0/ip_nestedDict.py) is honestly the most important file here.</b></br>
