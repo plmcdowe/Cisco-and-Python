@@ -7,62 +7,60 @@ from lg import *
 from regexFunctions import *
 from ip_nestedDict import remoteSites
 platform = 'cisco_ios'
-ls_sw=[]
-ls_rtr=[]
-ls_hosts=[] #nested lists of RTR/SWs per site, built from remoteSites dictionary
+ls_hosts=[] # nested lists of RTR/SWs per site, built from remoteSites dictionary
+ls_rtr=[]   # list of routers built from ls_hosts
+ls_sw=[]    # list of switches built from ls_hosts
 
-for key in remoteSites.keys():  #pulls out nested lists from dictionary
+for key in remoteSites.keys(): # K:V (nested lists) of dictionary- 'SiteName3':[['RTR-IP'], ['SW1-IP', 'SW2-IP', 'SW3-IP', 'SW4-IP']],
     hosts = remoteSites[key]
-    ls_hosts.append(hosts)   
-for list0, devices in enumerate(ls_hosts):   #enum list of sites  
-    for list1, device in enumerate(devices): #enum list of devices per site
-        if list1!=0:            
-            for list2, sw in enumerate(device): #enum lists of switches
-                ls_sw.append(sw) #appends switch ips to list ls_sw
+    ls_hosts.append(hosts)
+for list0, devices in enumerate(ls_hosts):   # enum lists of sites-            [['RTR-IP'], ['SW1-IP', 'SW2-IP', 'SW3-IP', 'SW4-IP']],
+    for list1, device in enumerate(devices): # enum lists of devices per site-  ['RTR-IP'], ['SW1-IP', 'SW2-IP', 'SW3-IP', 'SW4-IP']
+        if list1!=0: # list index is not 0 in list of lists                                 ['SW1-IP', 'SW2-IP', 'SW3-IP', 'SW4-IP']
+            for list2, sw in enumerate(device): # enum by switch in list of switches
+                ls_sw.append(sw) # append switch ips to list ls_sw
         else:
-            for list2, rtr in enumerate(device): #enum lists of routers
-                ls_rtr.append(rtr) #appends router ips to list ls_rtr
-for host in ls_rtr: #iterates string item (RTR IPs) as host for logging in
+            for list2, rtr in enumerate(device): # enum lists of routers, index 0 per site
+                ls_rtr.append(rtr) # append rtr ips to list ls_rtr
+# iterates router IPs as host from the router list
+for host in ls_rtr:
     start_re = messagebox.askyesno("Question","Next device?")
     if start_re == True:
         try:
             ch = ConnectHandler(ip = host, device_type = platform)
             print('logged into host: ',host)
-            enable = ch.find_prompt() #waits till '#'
+            enable = ch.find_prompt() # waits till '#'
             print('')
             
-            ipIntCommand = ch.send_command('sh ip int br | e unassigned') #sends sh ip int br exluding 'unassigned' interfaces
+            ipIntCommand = ch.send_command('sh ip int br | e unassigned') # sends sh ip int br exluding 'unassigned' interfaces
             print('----------sh ip int br----------')
             print(ipIntCommand)
             print('')
 
-            regex_ipInt = re.findall(r'(Gi\d{1}/\d{1}/\d{1}.\d{1,3})(?:.*?)(u|\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3})', ipIntCommand, re.S) #creates list of interface and ip groups -treats like nested lists
+            regex_ipInt = re.findall(r'(Gi\d{1}/\d{1}/\d{1}.\d{1,3})(?:.*?)(u|\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3})', ipIntCommand, re.S) # creates list of interface and ip groups -treats like nested lists
             print("----------regex finds [('SubInt', 'IP'), ...]----------")
             print(regex_ipInt)
             print('')
 
-            Interfaces = [i for sublist in regex_ipInt for i in sublist if '/' in i] #creates list of interfaces from regex_ipInt
-            IPs = [i for sublist in regex_ipInt for i in sublist if '/' not in i]   #creates list of IPs from regex_ipInt
-            #print(IPs)
-            #print(Interfaces)
-            #print('')
+            Interfaces = [i for sublist in regex_ipInt for i in sublist if '/' in i] # creates list of interfaces from regex_ipInt
+            IPs = [i for sublist in regex_ipInt for i in sublist if '/' not in i]   # creates list of IPs from regex_ipInt
         
-            for i, n in itertools.zip_longest(IPs, Interfaces): #formated print of IP and interface
+            for i, n in itertools.zip_longest(IPs, Interfaces): # formated print of IP and interface
                 print('IP: '+i+' | '+'INT: '+n)
             
             list_accessGroupInts = []
             list_subNets = []    
-            for i, n in itertools.zip_longest(IPs, Interfaces): #uses IP from sh int br
-                shRunInt = 'sh run int {} | i ^int.*Gi.*net(.*)/(.*)/(.*)\.[0-9]|^_ip_ad.*s_[0-9].*\.[0-9]$|^_ip_access-group_[DA]' #format where {} is iterated variable from interfaces
-                f_shRunInt = shRunInt.format(n) #formats the above string, {n} from list interfaces
-                shRunInt_c = ch.send_command(f_shRunInt) #netmiko sends the formated string as command
+            for i, n in itertools.zip_longest(IPs, Interfaces): # uses IP from sh int br
+                shRunInt = 'sh run int {} | i ^int.*Gi.*net(.*)/(.*)/(.*)\.[0-9]|^_ip_ad.*s_[0-9].*\.[0-9]$|^_ip_access-group_[DA]' # format where {} is iterated variable from interfaces
+                f_shRunInt = shRunInt.format(n) # formats the above string, {n} from list interfaces
+                shRunInt_c = ch.send_command(f_shRunInt) # netmiko sends the formated string as command
                 print(shRunInt_c)
                 IPsearchRegex = re.findall(r'(?:GigabitEthernet\d{1}/\d{1}/\d{1}.\d{1,3}.*?)(?:ip address '+i+'?) (\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3})', shRunInt_c, re.S) 
-                print(IPsearchRegex)    #IPsearchRegex iterates PRIMARY IP as i in regex to find only the PRIMARY IP's mask
+                print(IPsearchRegex) # IPsearchRegex iterates PRIMARY IP as i in regex to find only the PRIMARY IP's mask
                 print('')
                 print('--------------------')
-                accessGroup = accessGroupRegex(shRunInt_c)  #creates list of access-group
-                list_accessGroupInts.append(accessGroup)    #appends the regex list-result to access group list
+                accessGroup = accessGroupRegex(shRunInt_c)  # creates list of access-group
+                list_accessGroupInts.append(accessGroup)    # appends the regex list-result to access group list
                 list_subNets.append(IPsearchRegex)
             print(list_accessGroupInts)
             print(list_subNets)
@@ -72,35 +70,35 @@ for host in ls_rtr: #iterates string item (RTR IPs) as host for logging in
             noACL_ints=[]
             noACL_masks=[]
             for (Int, IP, nets, acl) in itertools.zip_longest(Interfaces, IPs, list_subNets, list_accessGroupInts):
-                if len(acl)==0: #if the lenght of item (acl) in list (accessGroupInts) is empty,
+                if len(acl)==0: # if the lenght of item (acl) in list (accessGroupInts) is empty,
                     noACL_IP.append(IP)
-                    noACL_ints.append(Int)  #append the IP 
-                    noACL_masks.append(nets)    #and subnet mask from corresponding indecies to the noACL lists
+                    noACL_ints.append(Int) # append the IP 
+                    noACL_masks.append(nets) # and subnet mask from corresponding indecies to the noACL lists
 
             print(noACL_ints)
             print(noACL_masks)
             print('--------------------')
 
-            strMasks = [mask for sublist in noACL_masks for mask in sublist] #list comp to pull the subnetmasks from list of interfaces with no ACL
+            strMasks = [mask for sublist in noACL_masks for mask in sublist] # list comp to pull the subnetmasks from list of interfaces with no ACL
             wildCardLast=[]
             inverseMask = []
-            for m in strMasks: #for each mask  
+            for m in strMasks: # for each mask  
                 wildcard=[]
-                for n in m.split('.'): #for each octet of mask when split on decimals
-                    net = 255 - int(n) #subtract octet from 255
-                    wildcard.append(str(net)) #appends each inversed octet to the wildcard list
-                wildcard = '.'.join(wildcard) #joins each with decimal
-                inverseMask.append(wildcard) #appends the reasabled inverse mask to inverseMask list
+                for n in m.split('.'): # for each octet of mask when split on decimals
+                    net = 255 - int(n) # subtract octet from 255
+                    wildcard.append(str(net)) #a ppends each inversed octet to the wildcard list
+                wildcard = '.'.join(wildcard) # joins each with decimal
+                inverseMask.append(wildcard) # appends the reasabled inverse mask to inverseMask list
             
-            vlans = [v.split('.') for v in noACL_ints] #splits the vlan on decimal
-            vlan = [v for sublist in vlans for v in sublist if '/' not in v] #list comp 
+            vlans = [v.split('.') for v in noACL_ints] # splits the vlan on decimal
+            vlan = [v for sublist in vlans for v in sublist if '/' not in v] # list comp 
             
             finalIP=[]
             finalInt=[]
             finalInverseMask=[]
             finalVlan=[]
             for (ips, ints, mask, vlans) in itertools.zip_longest(noACL_IP, noACL_ints, inverseMask, vlan): #
-                if vlans != '99': #if the vlan is not 99
+                if vlans != '99': # if the vlan is not 99
                     finalIP.append(ips)
                     finalInt.append(ints)
                     finalInverseMask.append(mask)
@@ -114,7 +112,7 @@ for host in ls_rtr: #iterates string item (RTR IPs) as host for logging in
             print('')
             print('----------Review the commands:----------')  
             print('conf t')
-## This whole section is formatting the acl and printing for review before sending the actual commands through netmiko            
+            # This section is formatting the acl and printing for review before sending the actual commands through netmiko            
             for (ip, mask, vlan) in itertools.zip_longest(finalIP, finalInverseMask, finalVlan):
                 print('')        
                 acl_name_c = 'ip access-list extended DATA-VLAN_{}'
@@ -153,11 +151,11 @@ for host in ls_rtr: #iterates string item (RTR IPs) as host for logging in
                 f_intAG_c = intAccessGroup_c.format(vlan)
                 print(f_intAG_c)
             print('')
-#Tkinter check to allow NA review of the ACL about to be applied            
+            # Tkinter check to allow NA review of the ACL about to be applied            
             Review_ck = messagebox.askyesno("Question","Everything look good?")
             if Review_ck == True:
                 
-#Block that sends the ACL config through netmiko
+                # Block that sends the ACL config through netmiko to the router
                 for (ip, mask, vlan) in itertools.zip_longest(finalIP, finalInverseMask, finalVlan):
                     acl_name_c = 'ip access-list extended DATA-VLAN_{}'
                     f_acl_c = acl_name_c.format(vlan)
