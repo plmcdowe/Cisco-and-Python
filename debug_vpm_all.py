@@ -7,22 +7,22 @@ import re
 from lg import *
 from ip_nestedDict import remoteSites
 platform = 'cisco_ios'
+ls_hosts=[] # nested lists of RTR/SWs per site, built from remoteSites dictionary
+ls_rtr=[]   # list of routers built from ls_hosts
+ls_sw=[]    # list of switches built from ls_hosts
 
-ls_sw=[]
-ls_rtr=[]
-ls_hosts=[]
-for key in remoteSites.keys():  #pulls out nested lists from dictionary
+for key in remoteSites.keys(): # K:V (nested lists) of dictionary- 'SiteName3':[['RTR-IP'], ['SW1-IP', 'SW2-IP', 'SW3-IP', 'SW4-IP']],
     hosts = remoteSites[key]
-    ls_hosts.append(hosts)   
-for list0, devices in enumerate(ls_hosts):   #enum list of sites  
-    for list1, device in enumerate(devices): #enum list of devices per site
-        if list1!=0:            
-            for list2, sw in enumerate(device):
-                ls_sw.append(sw) #based on positional enumeration, builds a list of all switches
+    ls_hosts.append(hosts)
+for list0, devices in enumerate(ls_hosts):   # enum lists of sites-            [['RTR-IP'], ['SW1-IP', 'SW2-IP', 'SW3-IP', 'SW4-IP']],
+    for list1, device in enumerate(devices): # enum lists of devices per site-  ['RTR-IP'], ['SW1-IP', 'SW2-IP', 'SW3-IP', 'SW4-IP']
+        if list1!=0: # list index is not 0 in list of lists                                 ['SW1-IP', 'SW2-IP', 'SW3-IP', 'SW4-IP']
+            for list2, sw in enumerate(device): # enum by switch in list of switches
+                ls_sw.append(sw) # append switch ips to list ls_sw
         else:
-            for list2, rtr in enumerate(device):
-                ls_rtr.append(rtr) #based on positional enumeration, builds a list of all routers
-                
+            for list2, rtr in enumerate(device): # enum lists of routers, index 0 per site
+                ls_rtr.append(rtr) # append rtr ips to list ls_rtr
+# iterates router IPs as host from the router list
 for host in ls_rtr:
     try:
         ch = ConnectHandler(ip = host, device_type = platform)
@@ -35,9 +35,9 @@ for host in ls_rtr:
         good_ls=[]
         bad_ls=[]
 
-        ## This block was for updating MGCP binding on VoIP subinterface prior to SIP trunk reconfig. ##
-        #used for pulling in the Gi0/0/0 or 0/0/1 
-        shIPbr=ch.send_command('sh ip int br | i \.XX')#VoIP subinterface removed
+        # This block was for updating MGCP binding on VoIP subinterface prior to SIP trunk reconfig.
+        # Used for pulling in the Gi0/0/0 or 0/0/1 
+        shIPbr=ch.send_command('sh ip int br | i \.XX') # VoIP subinterface ID sanitized
         r_voipIP=re.findall(r'(?:Gi?)(\d{1}\/\d{1}\/\d{1}\.XX)', shIPbr, re.S)
         print(r_voipIP)
         shIPdomain=ch.send_command('sh run | i ip domain')
@@ -57,9 +57,9 @@ for host in ls_rtr:
                 media=ch.send_config_set[f'mgcp bind media source-interface GigabitEthernet{IP}']
                 s_media=ch.send_config_set(media, cmd_verify=False, delay_factor=3)
                 print(s_media)
-        ## End Block for MGCP binding ##
+        # End Block for MGCP binding
 
-        #pulls in the fxo interfaces and their up/down status, then appends to a down list or an up list 
+        # Pulls in the fxo interfaces and their up/down status, then appends to a down list or an up list 
         shVoicePort=ch.send_command('sh voice port sum | i fxo-')
         r_voicePort=re.findall(r'(\d\/\d\/\d)(?:.*?)(fxo-ls)(?:.*?)(\w{2,4})(?:.*?)(do.*?[e|k])(?:.*?)([i|o].*?[e|k])', shVoicePort, re.M)
         print(r_voicePort)
@@ -73,10 +73,10 @@ for host in ls_rtr:
         print('down FXO: ',down_ls)
         print('up FXO: ',up_ls)
 
-        #pulls in all of the dial-peer configs
+        # Pulls in all of the dial-peer configs
         shDialPeer_Port=ch.send_command('sh run | i dial-peer|destination-pattern|^_port_(.*)/(.*)/(.*)')
 
-        #clears out all the fxo interface dial-peer config
+        # Clears out all the fxo interface dial-peer config
         r_dialPeer=re.findall(r'(?:voice\s?)(\d+?)(?:\spots)', shDialPeer_Port, re.S)
         for i in r_dialPeer:
             no_dialPeer=[f'no dial-peer voice {i} pots']
@@ -84,7 +84,7 @@ for host in ls_rtr:
             #print(s_noDial)
             time.sleep(1)
 
-        #for any shutdown fxo port, no shut it
+        # For any shutdown fxo port, no shut it
         if down_ls:
             for i in down_ls:
                 noShut=[f'voice-port {i}', 'no shut']
@@ -101,11 +101,11 @@ for host in ls_rtr:
             dialPeerINT.append(split_ls)
         print(dialPeerINT)
 
-        #starts the voice port module debug
+        # Starts the voice port module debug
         debugVPM=ch.send_command('debug vpm all')
         print(debugVPM)
 
-        #applies the MGCP service and the toll-free dial peer to each fxo interface        
+        # Applies the MGCP service and the toll-free dial peer to each fxo interface        
         for r, i in itertools.zip_longest(dialPeerINT, up_ls):
             rule_MGCP=[f'dial-peer voice 999{r} pots', 'service mgcpapp', f'port {i}']                        
             s_MGCP=ch.send_config_set(rule_MGCP, cmd_verify=False, exit_config_mode=False, delay_factor=3)            
@@ -115,18 +115,18 @@ for host in ls_rtr:
 
             time.sleep(5)
 
-        #clears the logg            
+        # Clears the logg            
             ch.write_channel('clear logg\n')
             time.sleep(2)
             ch.write_channel('y\n')
             time.sleep(10)
 
-        #notice to admin to place a toll-free call from their deskphone which is in the remote-site's calling search space - generating vpm loggs
+        # Notice to admin to place a toll-free call from their deskphone which is in the remote-site's calling search space - generating vpm loggs
             print('call now')
 
             time.sleep(20)
 
-        #regex for 'power_denial_detected' and the offhook status
+        # regex for 'power_denial_detected' and the offhook status
             loggDenial=ch.send_command(f'sh logg | i {denial}|{offhook}')
             
             time.sleep(2)
@@ -137,7 +137,7 @@ for host in ls_rtr:
             print(r_denial)
             print(r_hook)
 
-        #if the fxo interface went off-hook, it is added to the "good list"            
+        # If the fxo interface went off-hook, it is added to the "good list"            
             if r_denial==r_hook:
                 good_ls.append(r_hook[0])
             else:
@@ -151,7 +151,7 @@ for host in ls_rtr:
 
             time.sleep(2)        
 
-        #the testing dial-pears are removed
+        # The test dial-pears are removed
             noRule_MGCP=[f'no dial-peer voice 999{r} pots']                        
             s_noMGCP=ch.send_config_set(noRule_MGCP, cmd_verify=False, exit_config_mode=False, delay_factor=3)
             #print(s_noMGCP)
@@ -162,7 +162,7 @@ for host in ls_rtr:
             
             time.sleep(2)
 
-        #the bad interfaces are shut and a description is added
+        # The bad interfaces are shut and a description is added
         for i in bad_ls:
             shut=[f'voice-port {i}', 'shut', 'description power_denial']
             s_shut=ch.send_config_set(shut, cmd_verify=False, delay_factor=3)
@@ -188,7 +188,7 @@ for host in ls_rtr:
         print(dialPeerGood)
         print(inwardDPGood)
 
-    #Dial peers are applied to good fxo interfaces.
+    # Dial peers are applied to good fxo interfaces.
         time.sleep(2)
         if good_ls!='None':
             for r, i in itertools.zip_longest(dialPeerGood, good_ls):
@@ -216,7 +216,7 @@ for host in ls_rtr:
                 s_31=ch.send_config_set(rule_31, cmd_verify=False, delay_factor=3)
                 #print(s_31)      
 
-    #The final config is printed out for the Admin to review.
+    # The final config is printed out for the Admin to review.
         shVoicePort=ch.send_command('sh voice port sum | i fxo-')
         r_voicePort=re.findall(r'(\d\/\d\/\d)(?:.*?)(fxo-ls)(?:.*?)(\w{2,4})(?:.*?)(do.*?[e|k])(?:.*?)([i|o].*?[e|k])', shVoicePort, re.M)
         for i in r_voicePort:
